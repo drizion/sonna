@@ -1,7 +1,7 @@
 import { saveAs } from 'file-saver';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { FiDownload, FiEdit2, FiGrid, FiList, FiLoader, FiMusic, FiPlay, FiSquare, FiTrash2, FiX } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiGrid, FiList, FiLoader, FiMusic, FiPlay, FiSquare, FiTrash2, FiX, FiMoreVertical, FiPlus } from 'react-icons/fi';
 import { useDeleteTrack, useTracks } from '../hooks/useStorage';
 import { useConvertAudio } from '../hooks/useFFmpeg';
 import type { AudioFormat, StoredTrack } from '@music-downloader/shared';
@@ -13,9 +13,14 @@ interface TrackListProps {
   selectedTracks: Set<string>;
   onSelectionChange: (selected: Set<string>) => void;
   onPlayTrack?: (track: StoredTrack) => void;
+  onBulkActionsChange?: (actions: {
+    onDownload: () => void;
+    onAddToPlaylist: () => void;
+    onDelete: () => void;
+  }) => void;
 }
 
-export default function TrackList({ selectedTracks, onSelectionChange, onPlayTrack }: TrackListProps) {
+export default function TrackList({ selectedTracks, onSelectionChange, onPlayTrack, onBulkActionsChange }: TrackListProps) {
   const { data: tracks, isLoading } = useTracks();
   const deleteTrack = useDeleteTrack();
   const convertAudio = useConvertAudio();
@@ -27,6 +32,31 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   const [conversionProgress, setConversionProgress] = useState(0);
   const [isConverting, setIsConverting] = useState(false);
   const [editingTrack, setEditingTrack] = useState<StoredTrack | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Register bulk actions with parent
+  useEffect(() => {
+    if (onBulkActionsChange) {
+      onBulkActionsChange({
+        onDownload: handleBulkDownload,
+        onAddToPlaylist: handleBulkAddToPlaylist,
+        onDelete: handleBulkDelete,
+      });
+    }
+  }, [selectedTracks, onBulkActionsChange]);
 
   const handleToggleSelect = (trackId: string) => {
     const newSelected = new Set(selectedTracks);
@@ -47,7 +77,15 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   };
 
   const handleDelete = async (trackId: string, trackTitle: string) => {
-    if (!confirm(`Deseja deletar "${trackTitle}" permanentemente?`)) return;
+    // Close dropdown first
+    setOpenDropdown(null);
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir "${trackTitle}"?\n\nEsta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
 
     toast.promise(
       deleteTrack.mutateAsync(trackId),
@@ -57,6 +95,46 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
         error: 'Erro ao deletar música',
       }
     );
+  };
+
+  const handleEdit = (track: StoredTrack) => {
+    setOpenDropdown(null);
+    setEditingTrack(track);
+  };
+
+  const handleAddToPlaylist = (track: StoredTrack) => {
+    setOpenDropdown(null);
+    toast('Funcionalidade de playlist em breve!', { icon: '📋' });
+  };
+
+  const handleBulkDelete = async () => {
+    const count = selectedTracks.size;
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir ${count} música(s)?\n\nEsta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
+
+    const promises = Array.from(selectedTracks).map(id => deleteTrack.mutateAsync(id));
+    
+    toast.promise(
+      Promise.all(promises),
+      {
+        loading: `Deletando ${count} música(s)...`,
+        success: `${count} música(s) deletada(s) com sucesso!`,
+        error: 'Erro ao deletar músicas',
+      }
+    );
+
+    onSelectionChange(new Set());
+  };
+
+  const handleBulkDownload = () => {
+    toast('Download em massa em breve!', { icon: '📦' });
+  };
+
+  const handleBulkAddToPlaylist = () => {
+    toast('Adicionar várias músicas à playlist em breve!', { icon: '📋' });
   };
 
   const handleDownloadTrack = (track: StoredTrack) => {
@@ -140,7 +218,7 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   }
 
   return (
-    <div className="bg-[rgb(var(--color-surface))]/60 backdrop-blur-2xl rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 overflow-hidden">
+    <div className="bg-[rgb(var(--color-surface))]/60 backdrop-blur-2xl rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 overflow-hidden relative">
       {/* Header with View Mode Switcher */}
       <div className="p-3 md:p-6 border-b border-[rgb(var(--color-primary))]/10">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-0 mb-4">
@@ -194,12 +272,6 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
             </button>
           </div>
         </div>
-        
-        {selectedTracks.size > 0 && (
-          <div className="text-xs md:text-sm font-semibold text-[rgb(var(--color-on-surface))]/60 bg-[rgb(var(--color-surface-variant))]/50 px-3 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl inline-block">
-            {selectedTracks.size} selecionado(s)
-          </div>
-        )}
       </div>
 
       {/* Tracks Container */}
@@ -292,7 +364,7 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
 
                   {/* Actions */}
                   <div className="flex items-center space-x-1">
-                    {/* Bot\u00e3o Play - Mobile */}
+                    {/* Botão Play - Mobile */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -303,27 +375,67 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
                     >
                       <FiPlay className="w-5 h-5" />
                     </button>
-                    {/* Bot\u00e3o Download */}
+                    {/* Botão Download */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDownloadTrack(track);
                       }}
-                      className="p-2 md:p-2.5 text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 rounded-lg md:rounded-xl transition-all duration-200 hover:scale-110"
+                      disabled={selectedTracks.size > 0}
+                      className="p-2 md:p-2.5 text-[rgb(var(--color-primary))] hover:bg-[rgb(var(--color-primary))]/10 rounded-lg md:rounded-xl transition-all duration-200 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:scale-100"
                       title="Download"
                     >
                       <FiDownload className="w-4 h-4 md:w-5 md:h-5" />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(track.id, track.title);
-                      }}
-                      className="p-2 md:p-2.5 text-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent))]/10 rounded-lg md:rounded-xl transition-all duration-200 hover:scale-110"
-                      title="Deletar"
-                    >
-                      <FiTrash2 className="w-4 h-4 md:w-5 md:h-5" />
-                    </button>
+                    {/* Dropdown de Ações */}
+                    <div className="relative" ref={openDropdown === track.id ? dropdownRef : null}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdown(openDropdown === track.id ? null : track.id);
+                        }}
+                        disabled={selectedTracks.size > 0}
+                        className="p-2 md:p-2.5 text-[rgb(var(--color-on-surface))]/60 hover:text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 rounded-lg md:rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[rgb(var(--color-on-surface))]/60"
+                        title="Mais opções"
+                      >
+                        <FiMoreVertical className="w-4 h-4 md:w-5 md:h-5" />
+                      </button>
+                      {openDropdown === track.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-[rgb(var(--color-surface))] rounded-xl shadow-2xl border border-[rgb(var(--color-on-surface))]/10 py-1 z-50">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(track);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                          >
+                            <FiEdit2 className="w-4 h-4" />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToPlaylist(track);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                          >
+                            <FiPlus className="w-4 h-4" />
+                            <span>Adicionar à Playlist</span>
+                          </button>
+                          <div className="h-px bg-[rgb(var(--color-on-surface))]/10 my-1" />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(track.id, track.title);
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent))]/10 flex items-center space-x-3 transition-colors"
+                          >
+                            <FiTrash2 className="w-4 h-4" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -343,53 +455,58 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
                   selectedTracks.has(track.id)
                     ? 'ring-2 ring-[rgb(var(--color-primary))] ring-offset-2 ring-offset-[rgb(var(--color-background))] scale-[0.98]'
                     : 'hover:scale-[1.02]'
-                }`}
+                } ${openDropdown === track.id ? 'z-50' : 'z-0'}`}
               >
                 {/* Artwork */}
-                <div className="aspect-square bg-gradient-to-br from-[rgb(var(--color-surface-variant))] to-[rgb(var(--color-surface-variant))]/50 rounded-xl md:rounded-2xl flex items-center justify-center shadow-xl relative overflow-hidden">
-                  {track.artwork ? (
-                    <>
-                      <img src={track.artwork} alt={track.title} className="w-full h-full object-cover" />
-                      {/* Blurred background for overlay */}
-                      <img 
-                        src={track.artwork} 
-                        alt="" 
-                        className={`absolute inset-0 w-full h-full object-cover blur-md scale-110 transition-opacity duration-200 ${
-                          hoveredTrack === track.id ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </>
-                  ) : (
-                    <FiMusic className="w-8 h-8 md:w-12 md:h-12 text-[rgb(var(--color-on-surface))]/30" />
-                  )}
+                <div className="aspect-square bg-gradient-to-br from-[rgb(var(--color-surface-variant))] to-[rgb(var(--color-surface-variant))]/50 rounded-xl md:rounded-2xl flex items-center justify-center shadow-xl relative">
+                  <div className="absolute inset-0 overflow-hidden rounded-xl md:rounded-2xl">
+                    {track.artwork ? (
+                      <>
+                        <img src={track.artwork} alt={track.title} className="w-full h-full object-cover" />
+                        {/* Blurred background for overlay */}
+                        <img 
+                          src={track.artwork} 
+                          alt="" 
+                          className={`absolute inset-0 w-full h-full object-cover blur-md scale-110 transition-opacity duration-200 ${
+                            hoveredTrack === track.id ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          aria-hidden="true"
+                        />
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <FiMusic className="w-8 h-8 md:w-12 md:h-12 text-[rgb(var(--color-on-surface))]/30" />
+                      </div>
+                    )}
                   
-                  {/* Overlay with actions */}
-                  <div className={`absolute inset-0 bg-black/60 flex items-center justify-center space-x-1.5 md:space-x-2 transition-opacity duration-200 overflow-hidden rounded-xl md:rounded-2xl ${
-                    hoveredTrack === track.id ? 'opacity-100' : 'opacity-0'
-                  }`}>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPlayTrack?.(track);
-                      }}
-                      className="w-10 h-10 md:w-12 md:h-12 bg-white text-black rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
-                    >
-                      <FiPlay className="w-5 h-5 md:w-6 md:h-6 ml-0.5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadTrack(track);
-                      }}
-                      className="w-8 h-8 md:w-10 md:h-10 bg-[rgb(var(--color-primary))] text-white rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
-                    >
-                      <FiDownload className="w-4 h-4 md:w-5 md:h-5" />
-                    </button>
+                    {/* Overlay with actions */}
+                    <div className={`absolute inset-0 bg-black/60 flex items-center justify-center space-x-1.5 md:space-x-2 transition-opacity duration-200 ${
+                      hoveredTrack === track.id ? 'opacity-100' : 'opacity-0'
+                    }`}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlayTrack?.(track);
+                        }}
+                        className="w-10 h-10 md:w-12 md:h-12 bg-white text-black rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg"
+                      >
+                        <FiPlay className="w-5 h-5 md:w-6 md:h-6 ml-0.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadTrack(track);
+                        }}
+                        disabled={selectedTracks.size > 0}
+                        className="w-8 h-8 md:w-10 md:h-10 bg-[rgb(var(--color-primary))] text-white rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      >
+                        <FiDownload className="w-4 h-4 md:w-5 md:h-5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Checkbox */}
-                  <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 pointer-events-none">
+                  <div className="absolute top-1.5 left-1.5 md:top-2 md:left-2 pointer-events-none z-10">
                     <div className="w-4 h-4 md:w-5 md:h-5 rounded-md border-2 border-white/50 bg-black/30 backdrop-blur-sm shadow-lg flex items-center justify-center" style={{ backgroundColor: selectedTracks.has(track.id) ? 'rgb(var(--color-primary))' : 'rgba(0,0,0,0.3)' }}>
                       {selectedTracks.has(track.id) && (
                         <svg className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -399,16 +516,54 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
                     </div>
                   </div>
 
-                  {/* Delete button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(track.id, track.title);
-                    }}
-                    className="absolute top-1.5 right-1.5 md:top-2 md:right-2 w-7 h-7 md:w-8 md:h-8 bg-[rgb(var(--color-accent))]/90 backdrop-blur-sm text-white rounded-lg flex items-center justify-center transition-all hover:scale-110 shadow-lg opacity-0 group-hover:opacity-100"
-                  >
-                    <FiTrash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                  </button>
+                  {/* Action menu button */}
+                  <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 z-10" ref={openDropdown === track.id ? dropdownRef : null}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenDropdown(openDropdown === track.id ? null : track.id);
+                      }}
+                      disabled={selectedTracks.size > 0}
+                      className="w-7 h-7 md:w-8 md:h-8 bg-black/60 backdrop-blur-sm text-white rounded-lg flex items-center justify-center transition-all hover:scale-110 shadow-lg opacity-0 group-hover:opacity-100 disabled:opacity-0 disabled:cursor-not-allowed"
+                    >
+                      <FiMoreVertical className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    </button>
+                    {openDropdown === track.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-[rgb(var(--color-surface))] rounded-xl shadow-2xl border border-[rgb(var(--color-on-surface))]/10 py-1 z-[100]">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(track);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                        >
+                          <FiEdit2 className="w-4 h-4" />
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToPlaylist(track);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                        >
+                          <FiPlus className="w-4 h-4" />
+                          <span>Adicionar à Playlist</span>
+                        </button>
+                        <div className="h-px bg-[rgb(var(--color-on-surface))]/10 my-1" />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(track.id, track.title);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent))]/10 flex items-center space-x-3 transition-colors"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                          <span>Excluir</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Track Info */}
@@ -523,21 +678,60 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
                           e.stopPropagation();
                           handleDownloadTrack(track);
                         }}
-                        className="flex-1 px-2 py-1.5 md:px-3 md:py-2 bg-[rgb(var(--color-primary))]/10 hover:bg-[rgb(var(--color-primary))]/20 text-[rgb(var(--color-primary))] rounded-lg md:rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 md:space-x-2 font-medium text-xs md:text-sm"
+                        disabled={selectedTracks.size > 0}
+                        className="flex-1 px-2 py-1.5 md:px-3 md:py-2 bg-[rgb(var(--color-primary))]/10 hover:bg-[rgb(var(--color-primary))]/20 text-[rgb(var(--color-primary))] rounded-lg md:rounded-xl transition-all duration-200 flex items-center justify-center space-x-1 md:space-x-2 font-medium text-xs md:text-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[rgb(var(--color-primary))]/10"
                       >
                         <FiDownload className="w-3.5 h-3.5 md:w-4 md:h-4" />
                         <span>Baixar</span>
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(track.id, track.title);
-                        }}
-                        className="p-1.5 md:p-2 bg-[rgb(var(--color-accent))]/10 hover:bg-[rgb(var(--color-accent))]/20 text-[rgb(var(--color-accent))] rounded-lg md:rounded-xl transition-all duration-200"
-                        title="Deletar"
-                      >
-                        <FiTrash2 className="w-4 h-4" />
-                      </button>
+                      <div className="relative" ref={openDropdown === track.id ? dropdownRef : null}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenDropdown(openDropdown === track.id ? null : track.id);
+                          }}
+                          disabled={selectedTracks.size > 0}
+                          className="p-1.5 md:p-2 bg-[rgb(var(--color-surface-variant))]/30 hover:bg-[rgb(var(--color-surface-variant))]/50 text-[rgb(var(--color-on-surface))] rounded-lg md:rounded-xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[rgb(var(--color-surface-variant))]/30"
+                          title="Mais opções"
+                        >
+                          <FiMoreVertical className="w-4 h-4" />
+                        </button>
+                        {openDropdown === track.id && (
+                          <div className="absolute right-0 bottom-full mb-1 w-48 bg-[rgb(var(--color-surface))] rounded-xl shadow-2xl border border-[rgb(var(--color-on-surface))]/10 py-1 z-50">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(track);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                            >
+                              <FiEdit2 className="w-4 h-4" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToPlaylist(track);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30 flex items-center space-x-3 transition-colors"
+                            >
+                              <FiPlus className="w-4 h-4" />
+                              <span>Adicionar à Playlist</span>
+                            </button>
+                            <div className="h-px bg-[rgb(var(--color-on-surface))]/10 my-1" />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(track.id, track.title);
+                              }}
+                              className="w-full px-4 py-2.5 text-left text-sm text-[rgb(var(--color-accent))] hover:bg-[rgb(var(--color-accent))]/10 flex items-center space-x-3 transition-colors"
+                            >
+                              <FiTrash2 className="w-4 h-4" />
+                              <span>Excluir</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -640,6 +834,14 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
             </p>
           </div>
         </div>
+      )}
+
+      {/* Track Metadata Editor Modal */}
+      {editingTrack && (
+        <TrackMetadataEditor
+          track={editingTrack}
+          onClose={() => setEditingTrack(null)}
+        />
       )}
     </div>
   );

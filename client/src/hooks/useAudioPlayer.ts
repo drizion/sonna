@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { StoredTrack } from '@music-downloader/shared';
 
 interface UseAudioPlayerReturn {
@@ -46,7 +46,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     };
   }, []);
 
-  const play = (track: StoredTrack) => {
+  const play = useCallback((track: StoredTrack) => {
     if (!audioRef.current) return;
 
     // Se for uma música diferente, carrega a nova
@@ -58,33 +58,33 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
     audioRef.current.play();
     setIsPlaying(true);
-  };
+  }, [currentTrack]);
 
-  const pause = () => {
+  const pause = useCallback(() => {
     audioRef.current?.pause();
     setIsPlaying(false);
-  };
+  }, []);
 
-  const resume = () => {
+  const resume = useCallback(() => {
     audioRef.current?.play();
     setIsPlaying(true);
-  };
+  }, []);
 
-  const stop = () => {
+  const stop = useCallback(() => {
     if (!audioRef.current) return;
     audioRef.current.pause();
     audioRef.current.currentTime = 0;
     setIsPlaying(false);
     setCurrentTime(0);
     setCurrentTrack(null);
-  };
+  }, []);
 
-  const seek = (time: number) => {
+  const seek = useCallback((time: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = time;
       setCurrentTime(time);
     }
-  };
+  }, []);
 
   return {
     currentTrack,

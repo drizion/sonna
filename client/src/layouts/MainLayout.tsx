@@ -1,25 +1,60 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
+import { Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import DynamicIsland from './components/DynamicIsland';
-import LinkInput from './components/LinkInput';
-import Settings from './components/Settings';
-import TabMenu from './components/TabMenu';
-import TrackList from './components/TrackList';
-import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { setDownloadListener, clearDownloadNotification, type DownloadNotification } from './hooks/useDownload';
-import { useFFmpegPreload } from './hooks/useFFmpeg';
-import { useStorageQuota } from './hooks/useStorage';
-import type { StoredTrack } from '@music-downloader/shared';
+import DynamicIsland from '../components/DynamicIsland';
+import TabMenu from '../components/TabMenu';
+import ActionBar from '../components/ActionBar';
+import { useAudioPlayerContext } from '../contexts/AudioPlayerContext';
+import { setDownloadListener } from '../hooks/useDownload';
+import { useFFmpegPreload } from '../hooks/useFFmpeg';
+import { useStorageQuota } from '../hooks/useStorage';
 
-type Tab = 'download' | 'library' | 'settings';
+interface SelectionContextType {
+  selectedTracks: Set<string>;
+  setSelectedTracks: (tracks: Set<string>) => void;
+  bulkActions: {
+    onDownload: () => void;
+    onAddToPlaylist: () => void;
+    onDelete: () => void;
+  };
+  setBulkActions: (actions: SelectionContextType['bulkActions']) => void;
+}
 
-function App() {
+const SelectionContext = createContext<SelectionContextType | undefined>(undefined);
+
+export const useSelection = () => {
+  const context = useContext(SelectionContext);
+  if (!context) {
+    throw new Error('useSelection must be used within SelectionContext');
+  }
+  return context;
+};
+
+export default function MainLayout() {
+  const {
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    pause,
+    resume,
+    stop,
+    seek,
+    downloadNotification,
+    setDownloadNotification,
+    clearDownloadNotification,
+    isIslandExpanded,
+    setIsIslandExpanded,
+  } = useAudioPlayerContext();
+
   const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<Tab>('download');
-  const [downloadNotification, setDownloadNotification] = useState<DownloadNotification | null>(null);
-  const [isIslandExpanded, setIsIslandExpanded] = useState(false);
+  const [bulkActions, setBulkActions] = useState<SelectionContextType['bulkActions']>({
+    onDownload: () => {},
+    onAddToPlaylist: () => {},
+    onDelete: () => {},
+  });
+
   const { data: quota } = useStorageQuota();
-  const audioPlayer = useAudioPlayer();
 
   // Preload FFmpeg for audio conversion
   useFFmpegPreload();
@@ -29,7 +64,7 @@ function App() {
     setDownloadListener((notification) => {
       setDownloadNotification(notification);
     });
-  }, []);
+  }, [setDownloadNotification]);
 
   // Apply theme on initial load
   useEffect(() => {
@@ -56,33 +91,40 @@ function App() {
                        target.tagName === 'TEXTAREA' || 
                        target.isContentEditable;
         
-        if (!isInput && audioPlayer.currentTrack) {
+        if (!isInput && currentTrack) {
           e.preventDefault();
-          handlePlayPause();
+          if (isPlaying) {
+            pause();
+          } else {
+            resume();
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [audioPlayer.currentTrack, audioPlayer.isPlaying]);
-
-  const handlePlayTrack = (track: StoredTrack) => {
-    audioPlayer.play(track);
-  };
+  }, [currentTrack, isPlaying, pause, resume]);
 
   const handlePlayPause = () => {
-    if (audioPlayer.isPlaying) {
-      audioPlayer.pause();
+    if (isPlaying) {
+      pause();
     } else {
-      audioPlayer.resume();
+      resume();
     }
   };
 
+  const handleCancelSelection = () => {
+    setSelectedTracks(new Set());
+  };
+
+  const hasSelection = selectedTracks.size > 0;
+
   return (
-    <div className={`min-h-screen bg-[rgb(var(--color-background))] pb-24 md:pb-32 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-      isIslandExpanded ? 'pt-24 md:pt-28' : 'pt-12 md:pt-14'
-    }`}>
+    <SelectionContext.Provider value={{ selectedTracks, setSelectedTracks, bulkActions, setBulkActions }}>
+      <div className={`min-h-screen bg-[rgb(var(--color-background))] pb-24 md:pb-32 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        isIslandExpanded ? 'pt-24 md:pt-28' : 'pt-12 md:pt-14'
+      }`}>
       <Toaster 
         position="top-center"
         toastOptions={{
@@ -96,14 +138,14 @@ function App() {
       
       {/* Dynamic Island */}
       <DynamicIsland
-        currentTrack={audioPlayer.currentTrack}
-        isPlaying={audioPlayer.isPlaying}
-        currentTime={audioPlayer.currentTime}
-        duration={audioPlayer.duration}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        currentTime={currentTime}
+        duration={duration}
         onPlayPause={handlePlayPause}
         onStateChange={(state) => setIsIslandExpanded(state !== 'idle')}
-        onClose={audioPlayer.stop}
-        onSeek={audioPlayer.seek}
+        onClose={stop}
+        onSeek={seek}
         downloadProgress={downloadNotification?.type === 'progress' ? downloadNotification.progress : undefined}
         downloadingTrack={downloadNotification?.type === 'progress' ? downloadNotification.track : null}
         completedDownload={downloadNotification?.type === 'complete' ? downloadNotification.track : null}
@@ -134,36 +176,22 @@ function App() {
           </div>
         )}
 
-        {/* Tab Content */}
+        {/* Route Content */}
         <div className="transition-all duration-300 ease-in-out">
-          {activeTab === 'download' && (
-            <div className="animate-fade-in">
-              <LinkInput />
-            </div>
-          )}
-
-          {activeTab === 'library' && (
-            <div className="animate-fade-in">
-              <TrackList
-                selectedTracks={selectedTracks}
-                onSelectionChange={setSelectedTracks}
-                onPlayTrack={handlePlayTrack}
-              />
-            </div>
-          )}
-
-          {activeTab === 'settings' && (
-            <div className="animate-fade-in">
-              <Settings />
-            </div>
-          )}
+          <Outlet />
         </div>
       </main>
 
-      {/* Floating Tab Menu */}
-      <TabMenu activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Floating Tab Menu with integrated Action Bar */}
+      <TabMenu 
+        hasSelection={hasSelection}
+        selectedCount={selectedTracks.size}
+        onDownload={bulkActions.onDownload}
+        onAddToPlaylist={bulkActions.onAddToPlaylist}
+        onDelete={bulkActions.onDelete}
+        onCancel={handleCancelSelection}
+      />
     </div>
+    </SelectionContext.Provider>
   );
 }
-
-export default App;
