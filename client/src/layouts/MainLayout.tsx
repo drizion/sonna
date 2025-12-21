@@ -9,6 +9,21 @@ import { setDownloadListener } from '../hooks/useDownload';
 import { useFFmpegPreload } from '../hooks/useFFmpeg';
 import { useStorageQuota } from '../hooks/useStorage';
 
+interface ModalContextType {
+  isModalOpen: boolean;
+  setIsModalOpen: (open: boolean) => void;
+}
+
+const ModalContext = createContext<ModalContextType | undefined>(undefined);
+
+export const useModal = () => {
+  const context = useContext(ModalContext);
+  if (!context) {
+    throw new Error('useModal must be used within ModalContext');
+  }
+  return context;
+};
+
 interface SelectionContextType {
   selectedTracks: Set<string>;
   setSelectedTracks: (tracks: Set<string>) => void;
@@ -53,6 +68,7 @@ export default function MainLayout() {
     onAddToPlaylist: () => {},
     onDelete: () => {},
   });
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { data: quota } = useStorageQuota();
 
@@ -121,8 +137,9 @@ export default function MainLayout() {
   const hasSelection = selectedTracks.size > 0;
 
   return (
-    <SelectionContext.Provider value={{ selectedTracks, setSelectedTracks, bulkActions, setBulkActions }}>
-      <div className={`min-h-screen bg-[rgb(var(--color-background))] pb-24 md:pb-32 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+    <ModalContext.Provider value={{ isModalOpen, setIsModalOpen }}>
+      <SelectionContext.Provider value={{ selectedTracks, setSelectedTracks, bulkActions, setBulkActions }}>
+        <div className={`min-h-screen bg-[rgb(var(--color-background))] pb-24 md:pb-32 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] ${
         isIslandExpanded ? 'pt-24 md:pt-28' : 'pt-12 md:pt-14'
       }`}>
       <Toaster 
@@ -190,8 +207,10 @@ export default function MainLayout() {
         onAddToPlaylist={bulkActions.onAddToPlaylist}
         onDelete={bulkActions.onDelete}
         onCancel={handleCancelSelection}
+        isBlurred={isModalOpen}
       />
     </div>
     </SelectionContext.Provider>
+    </ModalContext.Provider>
   );
 }

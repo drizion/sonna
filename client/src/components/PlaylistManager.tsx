@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiEdit2, FiHeart, FiMusic, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 import type { Playlist } from '@music-downloader/shared';
 import { useDeletePlaylist, usePlaylists, useSavePlaylist } from '../hooks/usePlaylist';
+import { useModal } from '../layouts/MainLayout';
 
 interface PlaylistManagerProps {
   onSelectPlaylist: (playlistId: string | null) => void;
@@ -13,12 +14,18 @@ export default function PlaylistManager({ onSelectPlaylist, selectedPlaylistId }
   const { data: playlists } = usePlaylists();
   const savePlaylist = useSavePlaylist();
   const deletePlaylist = useDeletePlaylist();
+  const { setIsModalOpen } = useModal();
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [playlistColor, setPlaylistColor] = useState('#007AFF');
+
+  // Sincroniza o estado do modal com o contexto
+  useEffect(() => {
+    setIsModalOpen(showCreateModal || editingPlaylist !== null);
+  }, [showCreateModal, editingPlaylist, setIsModalOpen]);
 
   const handleCreatePlaylist = async () => {
     if (!playlistName.trim()) {
@@ -220,8 +227,19 @@ export default function PlaylistManager({ onSelectPlaylist, selectedPlaylistId }
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingPlaylist) && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[rgb(var(--color-surface))] rounded-2xl p-6 max-w-md w-full border border-[rgb(var(--color-primary))]/20">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowCreateModal(false);
+            setEditingPlaylist(null);
+            setPlaylistName('');
+            setPlaylistDescription('');
+          }}
+        >
+          <div 
+            className="bg-[rgb(var(--color-surface))] rounded-2xl p-6 max-w-md w-full border border-[rgb(var(--color-primary))]/20"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-[rgb(var(--color-on-surface))]">
                 {editingPlaylist ? 'Editar Playlist' : 'Nova Playlist'}

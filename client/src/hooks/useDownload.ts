@@ -99,6 +99,11 @@ export function useDownloadTrack() {
         },
       });
 
+      // Limpa a notificação após 3 segundos
+      setTimeout(() => {
+        globalDownloadListener?.(null);
+      }, 3000);
+
       return { skipped: false, track: storedTrack };
     },
   });

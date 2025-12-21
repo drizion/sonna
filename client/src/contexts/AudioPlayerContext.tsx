@@ -33,6 +33,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const [isIslandExpanded, setIsIslandExpanded] = useState(false);
 
   const clearDownloadNotification = () => {
+    console.log('[AudioPlayerContext] Clearing download notification');
     setDownloadNotification(null);
   };
 

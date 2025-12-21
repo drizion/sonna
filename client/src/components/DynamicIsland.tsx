@@ -57,25 +57,31 @@ export default function DynamicIsland({
       : 'idle';
 
     if (newState !== state) {
-      // Se está mudando de downloading para download-complete, não faz fade out
+      // Transições que não devem piscar (mantém conteúdo visível)
       const isDownloadingToComplete = state === 'downloading' && newState === 'download-complete';
+      const isCompleteToPlayer = state === 'download-complete' && newState === 'player';
+      const isCompleteToIdle = state === 'download-complete' && newState === 'idle';
+      const shouldKeepContentVisible = isDownloadingToComplete || isCompleteToPlayer || isCompleteToIdle;
       
       // Notifica o componente pai sobre a mudança de estado
       onStateChange?.(newState as IslandState);
       
-      if (isDownloadingToComplete) {
-        // Transição suave sem piscar
+      if (shouldKeepContentVisible) {
+        // Transição suave sem piscar - apenas troca o conteúdo
+        setIsTransitioning(true);
         setState(newState as IslandState);
         setShowContent(true);
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 300);
       } else {
+        // Fade out completo para outras transições
         setIsTransitioning(true);
         setShowContent(false);
         
-        // Fade out current content
         setTimeout(() => {
           setState(newState as IslandState);
           
-          // Fade in new content após a ilha expandir
           setTimeout(() => {
             setIsTransitioning(false);
             if (newState !== 'idle') {
@@ -85,19 +91,7 @@ export default function DynamicIsland({
         }, 150);
       }
     }
-
-    // Auto dismiss para download completo
-    if (completedDownload) {
-      const timer = setTimeout(() => {
-        setIsTransitioning(true);
-        setTimeout(() => {
-          onDismissDownload?.();
-          setIsTransitioning(false);
-        }, 300);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [currentTrack, downloadingTrack, downloadProgress, completedDownload, onDismissDownload, state]);
+  }, [currentTrack, downloadingTrack, downloadProgress, completedDownload, state, onStateChange]);
 
   // Verifica se o título está transbordando
   useEffect(() => {

@@ -6,6 +6,7 @@ import { useDeleteTrack, useTracks } from '../hooks/useStorage';
 import { useConvertAudio } from '../hooks/useFFmpeg';
 import type { AudioFormat, StoredTrack } from '@music-downloader/shared';
 import TrackMetadataEditor from './TrackMetadataEditor';
+import { useModal } from '../layouts/MainLayout';
 
 type ViewMode = 'list' | 'grid' | 'compact-grid';
 
@@ -24,16 +25,42 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   const { data: tracks, isLoading } = useTracks();
   const deleteTrack = useDeleteTrack();
   const convertAudio = useConvertAudio();
+  const { setIsModalOpen } = useModal();
   
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
   const [showFormatModal, setShowFormatModal] = useState(false);
+  const [isFormatModalAnimating, setIsFormatModalAnimating] = useState(false);
   const [selectedTrackForDownload, setSelectedTrackForDownload] = useState<StoredTrack | null>(null);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [isConverting, setIsConverting] = useState(false);
   const [editingTrack, setEditingTrack] = useState<StoredTrack | null>(null);
+  const [isEditModalAnimating, setIsEditModalAnimating] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sincroniza o estado dos modais com o contexto
+  useEffect(() => {
+    setIsModalOpen(showFormatModal || editingTrack !== null);
+  }, [showFormatModal, editingTrack, setIsModalOpen]);
+
+  // Anima entrada do modal de formato
+  useEffect(() => {
+    if (showFormatModal) {
+      setTimeout(() => setIsFormatModalAnimating(true), 10);
+    } else {
+      setIsFormatModalAnimating(false);
+    }
+  }, [showFormatModal]);
+
+  // Anima entrada do modal de edição
+  useEffect(() => {
+    if (editingTrack) {
+      setTimeout(() => setIsEditModalAnimating(true), 10);
+    } else {
+      setIsEditModalAnimating(false);
+    }
+  }, [editingTrack]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -140,6 +167,14 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   const handleDownloadTrack = (track: StoredTrack) => {
     setSelectedTrackForDownload(track);
     setShowFormatModal(true);
+  };
+
+  const handleCloseFormatModal = () => {
+    setIsFormatModalAnimating(false);
+    setTimeout(() => {
+      setShowFormatModal(false);
+      setSelectedTrackForDownload(null);
+    }, 200);
   };
 
   const handleFormatSelection = async (format: AudioFormat) => {
@@ -743,17 +778,24 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
 
       {/* Format Selection Modal */}
       {showFormatModal && selectedTrackForDownload && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-3 py-4 md:p-4">
-          <div className="bg-[rgb(var(--color-surface))] rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 max-w-md w-full p-4 md:p-6 max-h-[90vh] overflow-y-auto">
+        <div 
+          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] px-3 py-4 md:p-4 transition-opacity duration-200 ${
+            isFormatModalAnimating ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={handleCloseFormatModal}
+        >
+          <div 
+            className={`bg-[rgb(var(--color-surface))] rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 max-w-md w-full p-4 md:p-6 max-h-[90vh] overflow-y-auto transition-all duration-200 ${
+              isFormatModalAnimating ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-4 md:mb-6">
               <h3 className="text-lg md:text-xl font-bold text-[rgb(var(--color-on-surface))]">
                 Escolher Formato
               </h3>
               <button
-                onClick={() => {
-                  setShowFormatModal(false);
-                  setSelectedTrackForDownload(null);
-                }}
+                onClick={handleCloseFormatModal}
                 className="p-1.5 md:p-2 hover:bg-[rgb(var(--color-surface-variant))]/30 rounded-lg md:rounded-xl transition-all"
               >
                 <FiX className="w-5 h-5 text-[rgb(var(--color-on-surface))]/60" />

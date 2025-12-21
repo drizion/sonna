@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { FiCheck, FiX } from 'react-icons/fi';
 import type { StoredTrack } from '@music-downloader/shared';
@@ -30,6 +30,7 @@ const moods = [
 export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEditorProps) {
   const queryClient = useQueryClient();
   
+  const [isAnimating, setIsAnimating] = useState(false);
   const [title, setTitle] = useState(track.title);
   const [artist, setArtist] = useState(track.artist);
   const [album, setAlbum] = useState(track.album || '');
@@ -44,6 +45,11 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
   const [notes, setNotes] = useState(track.notes || '');
   const [tags, setTags] = useState(track.tags?.join(', ') || '');
   const [rating, setRating] = useState(track.rating || 0);
+
+  // Anima entrada
+  useEffect(() => {
+    setTimeout(() => setIsAnimating(true), 10);
+  }, []);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -84,15 +90,30 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
     updateMutation.mutate();
   };
 
+  const handleClose = () => {
+    setIsAnimating(false);
+    setTimeout(onClose, 200);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[rgb(var(--color-surface))] rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-[rgb(var(--color-on-surface))]/5 my-8">
+    <div 
+      className={`fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4 overflow-y-auto transition-opacity duration-200 ${
+        isAnimating ? 'opacity-100' : 'opacity-0'
+      }`}
+      onClick={handleClose}
+    >
+      <div 
+        className={`bg-[rgb(var(--color-surface))] rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-[rgb(var(--color-on-surface))]/5 my-8 transition-all duration-200 ${
+          isAnimating ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl font-bold text-[rgb(var(--color-on-surface))]">
             Editar Metadados
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-[rgb(var(--color-surface-variant))]/30 rounded-full transition-colors"
           >
             <FiX className="w-6 h-6 text-[rgb(var(--color-on-surface))]/60" />
@@ -315,7 +336,7 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
         {/* Actions */}
         <div className="flex gap-3 mt-6 pt-6 border-t border-[rgb(var(--color-on-surface))]/5">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex-1 py-3.5 bg-[rgb(var(--color-surface-variant))]/20 text-[rgb(var(--color-on-surface))] rounded-2xl font-semibold hover:bg-[rgb(var(--color-surface-variant))]/30 active:scale-[0.98] transition-all"
           >
             Cancelar

@@ -9,6 +9,7 @@ interface TabMenuProps {
   onAddToPlaylist?: () => void;
   onDelete?: () => void;
   onCancel?: () => void;
+  isBlurred?: boolean;
 }
 
 export default function TabMenu({
@@ -18,6 +19,7 @@ export default function TabMenu({
   onAddToPlaylist = () => {},
   onDelete = () => {},
   onCancel = () => {},
+  isBlurred = false,
 }: TabMenuProps) {
   const [showActions, setShowActions] = useState(false);
   const [showTabs, setShowTabs] = useState(true);
@@ -60,7 +62,7 @@ export default function TabMenu({
   }, [hasSelection]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
+    <div className={`fixed bottom-0 left-0 right-0 pb-safe transition-all duration-300 ${isBlurred ? 'z-10' : 'z-50'}`}>
       <div className="max-w-md mx-auto px-2 md:px-4 pb-3 md:pb-6">
         <nav 
           className={`
@@ -73,6 +75,7 @@ export default function TabMenu({
               ? 'w-[280px] md:w-[320px] border-[rgb(var(--color-primary))]/20' 
               : 'w-full border-[rgb(var(--color-on-surface))]/[0.08]'
             }
+            ${isBlurred ? 'blur-[6px] opacity-40 scale-[0.98] pointer-events-none' : ''}
           `}
         >
           {/* Background blur effect */}
