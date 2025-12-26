@@ -10,9 +10,32 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Configurar CORS para aceitar múltiplas origens
+const allowedOrigins = [
+  CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+  // Adicione outras origens conforme necessário
+];
+
 // Middleware
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: (origin, callback) => {
+    // Permitir requisições sem origin (como mobile apps ou curl)
+    if (!origin) return callback(null, true);
+    
+    // Permitir se a origin está na lista, se é do mesmo domínio, ou se é *.drizion.com
+    if (
+      allowedOrigins.includes(origin) || 
+      origin.startsWith('http://') ||
+      origin.endsWith('.drizion.com') ||
+      origin === 'https://drizion.com'
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
