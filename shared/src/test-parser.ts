@@ -21,9 +21,9 @@ function log(color: string, ...args: any[]) {
   console.log(color, ...args, colors.reset);
 }
 
-function test(description: string, fn: () => void) {
+async function test(description: string, fn: () => void | Promise<void>) {
   try {
-    fn();
+    await fn();
     log(colors.green, '✓', description);
   } catch (error: any) {
     log(colors.red, '✗', description);
@@ -42,52 +42,52 @@ console.log('='.repeat(60) + '\n');
 // Tests
 log(colors.blue, '📝 SoundCloud Track Tests');
 
-test('Parse track público com https', () => {
-  const result = parser.parse('https://soundcloud.com/artist/track');
+test('Parse track público com https', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/track');
   if (result.provider !== 'soundcloud') throw new Error('Wrong provider');
   if (result.contentType !== 'track') throw new Error('Wrong type');
   if (result.isPrivate !== false) throw new Error('Should be public');
 });
 
-test('Parse track sem protocolo', () => {
-  const result = parser.parse('soundcloud.com/artist/track');
+test('Parse track sem protocolo', async () => {
+  const result = await parser.parse('soundcloud.com/artist/track');
   if (!result.sanitizedUrl.startsWith('https://')) throw new Error('Missing https://');
 });
 
-test('Remove query params desnecessários', () => {
-  const result = parser.parse('https://soundcloud.com/artist/track?si=abc&utm_source=test');
+test('Remove query params desnecessários', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/track?si=abc&utm_source=test');
   if (result.sanitizedUrl.includes('?')) throw new Error('Query params not removed');
 });
 
-test('Parse track privado', () => {
-  const result = parser.parse('https://soundcloud.com/artist/track/s-ABC123');
+test('Parse track privado', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/track/s-ABC123');
   if (!result.isPrivate) throw new Error('Should be private');
   if (result.metadata.secretToken !== 's-ABC123') throw new Error('Wrong secret token');
 });
 
-test('Track com ?in= deve ser detectado como track', () => {
-  const result = parser.parse('https://soundcloud.com/artist/track?in=artist/sets/playlist');
+test('Track com ?in= deve ser detectado como track', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/track?in=artist/sets/playlist');
   if (result.contentType !== 'track') throw new Error('Should be track, not playlist');
 });
 
 console.log('');
 log(colors.blue, '📝 SoundCloud Playlist Tests');
 
-test('Parse playlist pública', () => {
-  const result = parser.parse('https://soundcloud.com/artist/sets/playlist');
+test('Parse playlist pública', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/sets/playlist');
   if (result.contentType !== 'playlist') throw new Error('Wrong type');
   if (result.isPrivate !== false) throw new Error('Should be public');
 });
 
-test('Parse playlist privada', () => {
-  const result = parser.parse('https://soundcloud.com/artist/sets/playlist/s-TOKEN');
+test('Parse playlist privada', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/sets/playlist/s-TOKEN');
   if (!result.isPrivate) throw new Error('Should be private');
   if (result.contentType !== 'playlist') throw new Error('Wrong type');
 });
 
-test('Parse playlist privada com query params', () => {
+test('Parse playlist privada com query params', async () => {
   const url = 'https://soundcloud.com/drizion/sets/playlist/s-Token?si=abc&utm_source=clipboard';
-  const result = parser.parse(url);
+  const result = await parser.parse(url);
   if (result.sanitizedUrl.includes('?')) throw new Error('Query params not removed');
   if (result.metadata.secretToken !== 's-Token') throw new Error('Secret token lost');
 });
@@ -95,45 +95,45 @@ test('Parse playlist privada com query params', () => {
 console.log('');
 log(colors.blue, '📝 Metadata Extraction Tests');
 
-test('Extrai artist slug corretamente', () => {
-  const result = parser.parse('https://soundcloud.com/my-artist/track');
+test('Extrai artist slug corretamente', async () => {
+  const result = await parser.parse('https://soundcloud.com/my-artist/track');
   if (result.metadata.artistSlug !== 'my-artist') throw new Error('Wrong artist slug');
 });
 
-test('Extrai track slug corretamente', () => {
-  const result = parser.parse('https://soundcloud.com/artist/my-track');
+test('Extrai track slug corretamente', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/my-track');
   if (result.metadata.trackSlug !== 'my-track') throw new Error('Wrong track slug');
 });
 
-test('Extrai playlist slug corretamente', () => {
-  const result = parser.parse('https://soundcloud.com/artist/sets/my-playlist');
+test('Extrai playlist slug corretamente', async () => {
+  const result = await parser.parse('https://soundcloud.com/artist/sets/my-playlist');
   if (result.metadata.playlistSlug !== 'my-playlist') throw new Error('Wrong playlist slug');
 });
 
 console.log('');
 log(colors.blue, '📝 Error Handling Tests');
 
-test('Rejeita URL vazia', () => {
+test('Rejeita URL vazia', async () => {
   try {
-    parser.parse('');
+    await parser.parse('');
     throw new Error('Should have thrown error');
   } catch (error) {
     if (!(error instanceof InvalidMusicUrlError)) throw error;
   }
 });
 
-test('Rejeita URL de outro provider', () => {
+test('Rejeita URL de outro provider', async () => {
   try {
-    parser.parse('https://spotify.com/track/123');
+    await parser.parse('https://spotify.com/track/123');
     throw new Error('Should have thrown error');
   } catch (error) {
     if (!(error instanceof InvalidMusicUrlError)) throw error;
   }
 });
 
-test('Rejeita URL com formato inválido', () => {
+test('Rejeita URL com formato inválido', async () => {
   try {
-    parser.parse('https://soundcloud.com/');
+    await parser.parse('https://soundcloud.com/');
     throw new Error('Should have thrown error');
   } catch (error) {
     if (!(error instanceof InvalidMusicUrlError)) throw error;

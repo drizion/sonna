@@ -38,7 +38,7 @@ export class MusicUrlParserFactory {
    * @returns Informações extraídas da URL
    * @throws InvalidMusicUrlError se nenhum parser puder processar a URL
    */
-  parse(url: string): ParsedMusicUrl {
+  async parse(url: string): Promise<ParsedMusicUrl> {
     if (!url || typeof url !== 'string' || url.trim().length === 0) {
       throw new InvalidMusicUrlError(url, 'URL cannot be empty');
     }
@@ -54,7 +54,7 @@ export class MusicUrlParserFactory {
       );
     }
 
-    return parser.parse(url);
+    return await parser.parse(url);
   }
 
   /**

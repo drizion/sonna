@@ -24,7 +24,7 @@ router.post('/resolve', async (req: Request, res: Response) => {
     }
 
     // Parse e sanitiza a URL
-    const parsed = parserFactory.parse(url);
+    const parsed = await parserFactory.parse(url);
     
     // Usa a URL sanitizada para buscar informações
     const info = await getSoundCloudInfo(parsed.sanitizedUrl);

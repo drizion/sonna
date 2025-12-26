@@ -20,7 +20,7 @@ export interface MusicUrlParser {
    * @returns Informações extraídas da URL
    * @throws InvalidMusicUrlError se a URL for inválida
    */
-  parse(url: string): ParsedMusicUrl;
+  parse(url: string): ParsedMusicUrl | Promise<ParsedMusicUrl>;
   
   /**
    * Sanitiza a URL removendo query params desnecessários

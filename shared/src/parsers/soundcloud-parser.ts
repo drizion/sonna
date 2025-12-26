@@ -11,6 +11,9 @@ export class SoundCloudParser implements MusicUrlParser {
 
   // Regex patterns para diferentes tipos de URL
   private readonly patterns = {
+    // URL curta mobile: on.soundcloud.com/...
+    shortUrl: /^(?:https?:\/\/)?on\.soundcloud\.com\/([A-Za-z0-9]+)(?:\?.*)?$/i,
+    
     // Track público: soundcloud.com/artist/track
     trackPublic: /^(?:https?:\/\/)?(?:www\.)?soundcloud\.com\/([^\/]+)\/([^\/\?]+)(?:\?.*)?$/i,
     
@@ -33,12 +36,46 @@ export class SoundCloudParser implements MusicUrlParser {
     return normalized.includes('soundcloud.com');
   }
 
-  parse(url: string): ParsedMusicUrl {
+  /**
+   * Resolve uma URL curta (on.soundcloud.com) para a URL completa
+   */
+  private async resolveShortUrl(url: string): Promise<string> {
+    try {
+      const response = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'manual'
+      });
+      
+      const location = response.headers.get('location');
+      if (location) {
+        return location;
+      }
+      
+      // Se não conseguir pelo HEAD, tentar GET
+      const getResponse = await fetch(url, { redirect: 'manual' });
+      const getLocation = getResponse.headers.get('location');
+      
+      if (getLocation) {
+        return getLocation;
+      }
+      
+      throw new Error('Could not resolve short URL');
+    } catch (error) {
+      throw new InvalidMusicUrlError(url, 'Failed to resolve short SoundCloud URL');
+    }
+  }
+
+  async parse(url: string): Promise<ParsedMusicUrl> {
     if (!this.canParse(url)) {
       throw new InvalidMusicUrlError(url, 'Not a SoundCloud URL');
     }
 
-    const normalized = this.normalizeUrl(url);
+    let normalized = this.normalizeUrl(url);
+    
+    // Verificar se é uma URL curta e resolver
+    if (normalized.match(this.patterns.shortUrl)) {
+      normalized = await this.resolveShortUrl(normalized);
+    }
     
     // Tentar match com cada pattern
     let match: RegExpMatchArray | null = null;
@@ -132,6 +169,12 @@ export class SoundCloudParser implements MusicUrlParser {
 
   sanitize(url: string): string {
     const normalized = this.normalizeUrl(url);
+    
+    // Se for uma URL curta, retornar normalizada sem processar
+    // Será resolvida no backend durante o parse
+    if (normalized.match(this.patterns.shortUrl)) {
+      return normalized;
+    }
     
     // Remover todos os query params
     const urlWithoutQuery = normalized.split('?')[0];
