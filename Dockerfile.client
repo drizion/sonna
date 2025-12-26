@@ -1,6 +1,10 @@
 # Build stage
 FROM node:18-alpine AS builder
 
+# Accept build argument for API URL
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 WORKDIR /app
 
 # Copy package files
@@ -18,7 +22,7 @@ COPY shared ./shared
 # Build shared first (dependency for client)
 RUN npm run build --workspace=shared
 
-# Build client
+# Build client with VITE_API_URL baked in
 RUN npm run build --workspace=client
 
 # Production stage with nginx
