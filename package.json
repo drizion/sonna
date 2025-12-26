@@ -1,7 +1,7 @@
 {
   "name": "music-downloader",
   "version": "1.0.0",
-  "description": "DJ Music Downloader - Web app for downloading and organizing music from SoundCloud",
+  "description": "DJ Music Downloader - Web app for downloading and organizing music",
   "private": true,
   "workspaces": [
     "client",
