@@ -86,7 +86,7 @@ export async function getAudioMetadata(inputBuffer: Buffer): Promise<any> {
   return new Promise((resolve, reject) => {
     const inputStream = Readable.from(inputBuffer);
 
-    ffmpeg.ffprobe(inputStream, (err, metadata) => {
+    ffmpeg.ffprobe(inputStream as any, (err, metadata) => {
       if (err) {
         reject(err);
       } else {

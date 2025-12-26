@@ -1,4 +1,4 @@
-import type { Playlist, StorageMetadata, StoredTrack } from '@music-downloader/shared';
+import type { Playlist, StorageMetadata, StoredTrack, Track } from '@music-downloader/shared';
 import { DBSchema, IDBPDatabase, openDB } from 'idb';
 
 interface MusicDB extends DBSchema {
@@ -50,7 +50,8 @@ export async function getDB(): Promise<IDBPDatabase<MusicDB>> {
 
         // Create playlists store
         const playlistStore = db.createObjectStore('playlists', { keyPath: 'id' });
-        playlistStore.createIndex('by-date', 'syncDate');
+        playlistStore.createIndex('by-created', 'createdDate');
+        playlistStore.createIndex('by-updated', 'updatedDate');
         playlistStore.createIndex('by-source', 'source');
 
         // Create metadata store
@@ -63,8 +64,8 @@ export async function getDB(): Promise<IDBPDatabase<MusicDB>> {
         const playlistStore = transaction.objectStore('playlists');
         
         // Delete old indexes if they exist
-        if (playlistStore.indexNames.contains('by-date')) {
-          playlistStore.deleteIndex('by-date');
+        if (playlistStore.indexNames.contains('by-date' as any)) {
+          playlistStore.deleteIndex('by-date' as any);
         }
         
         // Create new indexes

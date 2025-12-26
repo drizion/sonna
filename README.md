@@ -66,8 +66,47 @@ music-downloader/
 ├── client/          # React frontend
 ├── server/          # Node.js backend
 ├── shared/          # Shared TypeScript types
+├── .github/         # CI/CD workflows
+├── scripts/         # Deployment scripts
 └── package.json     # Root workspace configuration
 ```
+
+## Docker
+
+### Development
+
+```bash
+# Build and run with Docker Compose
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop containers
+docker compose down
+```
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3001`
+
+### Production Deployment
+
+**Configurar CI/CD automático:**
+
+1. Leia o guia completo: [.github/workflows/README.md](.github/workflows/README.md)
+
+2. Configure os secrets no GitHub:
+   - `SERVER_HOST` - IP ou domínio do servidor
+   - `SERVER_USER` - Usuário SSH
+   - `SERVER_SSH_KEY` - Chave privada SSH
+   - `DEPLOY_PATH` - Caminho no servidor (opcional)
+
+3. No servidor, execute uma vez:
+   ```bash
+   bash <(curl -s https://raw.githubusercontent.com/drizion/sonna/main/scripts/setup-server.sh)
+   ```
+
+4. Faça push na branch `main` - deploy automático! 🚀
 
 ## License
 

@@ -75,7 +75,7 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
         energy,
         mood: mood || undefined,
         notes: notes || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : undefined,
+        tags: tags ? tags.split(',').map((t: string) => t.trim()).filter((t: string) => t) : undefined,
         rating: rating || undefined,
       });
     },

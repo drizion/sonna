@@ -1,0 +1,42 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.vscode
+.DS_Store
+*.log
+coverage
+.nyc_output
+dist
+build
+*.local
+
+# Client specific
+client/node_modules
+client/dist
+client/.vite
+
+# Server specific
+server/node_modules
+server/dist
+
+# Shared specific
+shared/node_modules
+shared/dist
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+__tests__
+test
+tests
