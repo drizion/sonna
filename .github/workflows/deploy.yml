@@ -87,12 +87,76 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          command_timeout: 30m
+          script_stop: true
           script: |
+            echo "📁 Navegando para diretório de deploy..."
             cd ${{ secrets.DEPLOY_PATH || '~/music-downloader' }}
-            echo "Pulling latest images..."
+            pwd
+            
+            echo ""
+            echo "🔐 Logging in to GitHub Container Registry..."
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            echo ""
+            echo "📥 Pulling latest images..."
             docker compose -f docker-compose.prod.yml pull
-            echo "Restarting services..."
+            
+            echo ""
+            echo "🔄 Restarting services..."
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            echo "Cleaning up old images..."
+            
+            echo ""
+            echo "⏳ Aguardando containers iniciarem (5s)..."
+            sleep 5
+            
+            echo ""
+            echo "📊 Status dos containers:"
+            docker compose -f docker-compose.prod.yml ps
+            
+            echo ""
+            echo "🔍 Logs recentes:"
+            docker compose -f docker-compose.prod.yml logs --tail=20
+            
+            echo ""
+            echo "🧹 Cleaning up old images..."
             docker image prune -f
-            echo "Deployment completed successfully!"
+            
+            echo ""
+            echo "✅ Deployment completed!"
+            echo "🌐 Aplicação disponível em: http://${{ secrets.SERVER_HOST }}"
+      
+      - name: Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            echo "🏥 Verificando saúde da aplicação..."
+            cd ${{ secrets.DEPLOY_PATH || '~/music-downloader' }}
+            
+            # Aguardar um pouco mais para os serviços subirem
+            sleep 3
+            
+            # Verificar se os containers estão rodando
+            if docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+              echo "✅ Containers estão rodando"
+            else
+              echo "❌ Erro: Containers não estão rodando"
+              docker compose -f docker-compose.prod.yml ps
+              exit 1
+            fi
+            
+            # Tentar fazer uma requisição local (ajuste a porta conforme seu docker-compose)
+            echo ""
+            echo "🔌 Testando conexão HTTP local..."
+            if curl -f -s -o /dev/null -w "%{http_code}" http://localhost:80 || curl -f -s -o /dev/null -w "%{http_code}" http://localhost:3000; then
+              echo "✅ Aplicação respondendo"
+            else
+              echo "⚠️  Aviso: Aplicação pode não estar respondendo ainda"
+            fi
+            
+            echo ""
+            echo "📍 URL de acesso: http://${{ secrets.SERVER_HOST }}"
