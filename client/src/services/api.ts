@@ -4,6 +4,7 @@ import type {
     SoundCloudPlaylistInfo,
     SoundCloudTrackInfo
 } from '@music-downloader/shared';
+import { MusicUrlParserFactory, SoundCloudParser } from '@music-downloader/shared';
 import axios from 'axios';
 
 const API_BASE_URL = '/api';
@@ -15,13 +16,20 @@ const api = axios.create({
   },
 });
 
+// Inicializar o parser factory
+const parserFactory = new MusicUrlParserFactory();
+parserFactory.register(new SoundCloudParser());
+
 /**
  * Resolve a SoundCloud URL (track or playlist)
  * Token is automatically extracted from URL if present (e.g., ?secret_token=...)
  */
 export async function resolveUrl(url: string): Promise<ResolveUrlResponse> {
+  // Sanitiza a URL antes de enviar
+  const sanitizedUrl = parserFactory.sanitize(url);
+  
   const response = await api.post<ResolveUrlResponse>('/soundcloud/resolve', {
-    url,
+    url: sanitizedUrl,
   } as ResolveUrlRequest);
   return response.data;
 }

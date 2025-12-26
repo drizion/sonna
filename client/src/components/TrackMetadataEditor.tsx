@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { FiCheck, FiX } from 'react-icons/fi';
 import type { StoredTrack } from '@music-downloader/shared';
@@ -46,9 +47,16 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
   const [tags, setTags] = useState(track.tags?.join(', ') || '');
   const [rating, setRating] = useState(track.rating || 0);
 
-  // Anima entrada
+  // Anima entrada e bloqueia scroll
   useEffect(() => {
     setTimeout(() => setIsAnimating(true), 10);
+    
+    // Bloquear scroll da página quando modal está aberto
+    document.body.classList.add('modal-open');
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
   }, []);
 
   const updateMutation = useMutation({
@@ -95,9 +103,9 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
     setTimeout(onClose, 200);
   };
 
-  return (
+  return createPortal(
     <div 
-      className={`fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[60] p-4 overflow-y-auto transition-opacity duration-200 ${
+      className={`fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[9999] p-4 overflow-y-auto transition-opacity duration-200 ${
         isAnimating ? 'opacity-100' : 'opacity-0'
       }`}
       onClick={handleClose}
@@ -351,6 +359,7 @@ export default function TrackMetadataEditor({ track, onClose }: TrackMetadataEdi
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

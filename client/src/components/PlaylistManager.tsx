@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { FiEdit2, FiHeart, FiMusic, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 import type { Playlist } from '@music-downloader/shared';
@@ -22,9 +23,21 @@ export default function PlaylistManager({ onSelectPlaylist, selectedPlaylistId }
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [playlistColor, setPlaylistColor] = useState('#007AFF');
 
-  // Sincroniza o estado do modal com o contexto
+  // Sincroniza o estado do modal com o contexto e bloqueia scroll
   useEffect(() => {
-    setIsModalOpen(showCreateModal || editingPlaylist !== null);
+    const isOpen = showCreateModal || editingPlaylist !== null;
+    setIsModalOpen(isOpen);
+    
+    // Bloquear scroll da página quando modal está aberto
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
   }, [showCreateModal, editingPlaylist, setIsModalOpen]);
 
   const handleCreatePlaylist = async () => {
@@ -226,9 +239,9 @@ export default function PlaylistManager({ onSelectPlaylist, selectedPlaylistId }
       </div>
 
       {/* Create/Edit Modal */}
-      {(showCreateModal || editingPlaylist) && (
+      {(showCreateModal || editingPlaylist) && createPortal(
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
           onClick={() => {
             setShowCreateModal(false);
             setEditingPlaylist(null);
@@ -310,7 +323,8 @@ export default function PlaylistManager({ onSelectPlaylist, selectedPlaylistId }
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

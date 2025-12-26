@@ -86,6 +86,10 @@ export async function getDB(): Promise<IDBPDatabase<MusicDB>> {
  */
 export async function saveTrack(track: StoredTrack): Promise<void> {
   const db = await getDB();
+  // Adiciona timestamp de criação se não existir
+  if (!track.createdAt) {
+    track.createdAt = Date.now();
+  }
   await db.put('tracks', track);
 }
 

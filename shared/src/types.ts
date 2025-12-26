@@ -4,6 +4,39 @@ export type AudioFormat = 'original' | 'mp3' | 'wav' | 'flac' | 'aac' | 'm4a' | 
 // Source platforms
 export type MusicSource = 'soundcloud' | 'local';
 
+// Music providers
+export type MusicProvider = 'soundcloud' | 'spotify' | 'youtube' | 'apple-music';
+
+// Content types
+export type ContentType = 'track' | 'playlist' | 'album' | 'artist';
+
+// Parsed music URL result
+export interface ParsedMusicUrl {
+  provider: MusicProvider;
+  contentType: ContentType;
+  isPrivate: boolean;
+  sanitizedUrl: string;  // URL limpa sem query params desnecessários
+  metadata: {
+    artistSlug?: string;
+    trackSlug?: string;
+    playlistSlug?: string;
+    albumSlug?: string;
+    secretToken?: string;  // Para conteúdo privado
+  };
+  originalUrl: string;
+}
+
+// Invalid music URL error
+export class InvalidMusicUrlError extends Error {
+  constructor(
+    public url: string,
+    public reason: string
+  ) {
+    super(`Invalid music URL: ${reason}`);
+    this.name = 'InvalidMusicUrlError';
+  }
+}
+
 // Track metadata
 export interface Track {
   id: string;
@@ -15,6 +48,7 @@ export interface Track {
   source: MusicSource;
   format: AudioFormat;
   downloadDate: Date;
+  createdAt?: number; // timestamp para ordenação
   fileSize?: number; // in bytes
   // User editable metadata
   bpm?: number;
@@ -118,10 +152,15 @@ export interface SoundCloudPlaylistInfo {
 // API request/response types
 export interface ResolveUrlRequest {
   url: string;
+  provider?: MusicProvider;  // Force specific provider
+  preferredType?: ContentType;  // Prefer track over playlist when ambiguous
 }
 
 export interface ResolveUrlResponse {
-  type: 'track' | 'playlist';
+  provider: MusicProvider;
+  type: ContentType;
+  isPrivate: boolean;
+  sanitizedUrl: string;
   data: SoundCloudTrackInfo | SoundCloudPlaylistInfo;
 }
 

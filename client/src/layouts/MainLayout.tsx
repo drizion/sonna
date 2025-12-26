@@ -145,10 +145,30 @@ export default function MainLayout() {
       <Toaster 
         position="top-center"
         toastOptions={{
-          className: 'backdrop-blur-xl bg-[rgb(var(--color-surface))]/80 border border-[rgb(var(--color-primary))]/20',
+          className: 'backdrop-blur-xl bg-[rgb(var(--color-surface))]/90 border border-[rgb(var(--color-primary))]/20',
           style: {
             borderRadius: '16px',
             padding: '16px',
+            color: 'rgb(var(--color-on-surface))',
+            background: 'rgba(var(--color-surface), 0.9)',
+          },
+          success: {
+            iconTheme: {
+              primary: 'rgb(var(--color-primary))',
+              secondary: 'rgb(var(--color-surface))',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: 'rgb(var(--color-surface))',
+            },
+          },
+          loading: {
+            iconTheme: {
+              primary: 'rgb(var(--color-primary))',
+              secondary: 'rgb(var(--color-surface))',
+            },
           },
         }}
       />
@@ -166,6 +186,7 @@ export default function MainLayout() {
         downloadProgress={downloadNotification?.type === 'progress' ? downloadNotification.progress : undefined}
         downloadingTrack={downloadNotification?.type === 'progress' ? downloadNotification.track : null}
         completedDownload={downloadNotification?.type === 'complete' ? downloadNotification.track : null}
+        playlistProgress={downloadNotification?.type === 'playlist-progress' ? downloadNotification.playlist : null}
         onDismissDownload={clearDownloadNotification}
       />
       

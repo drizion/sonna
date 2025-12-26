@@ -184,6 +184,13 @@ body {
   min-height: 100vh;
 }
 
+/* Prevenir scroll quando modal está aberto */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+}
+
 #root {
   min-height: 100vh;
 }

@@ -18,6 +18,7 @@ interface DynamicIslandProps {
   downloadProgress?: number;
   downloadingTrack?: { title: string; artist: string; artwork?: string } | null;
   completedDownload?: { title: string; artwork?: string } | null;
+  playlistProgress?: { title: string; current: number; total: number; currentTrack: string } | null;
   onDismissDownload?: () => void;
   
   // State callback
@@ -35,6 +36,7 @@ export default function DynamicIsland({
   downloadProgress,
   downloadingTrack,
   completedDownload,
+  playlistProgress,
   onDismissDownload,
   onStateChange,
 }: DynamicIslandProps) {
@@ -50,6 +52,8 @@ export default function DynamicIsland({
   useEffect(() => {
     const newState = completedDownload
       ? 'download-complete'
+      : playlistProgress
+      ? 'downloading'
       : downloadingTrack && downloadProgress !== undefined
       ? 'downloading'
       : currentTrack
@@ -292,17 +296,25 @@ export default function DynamicIsland({
         )}
 
         {/* Downloading State */}
-        {state === 'downloading' && downloadingTrack && (
+        {state === 'downloading' && (downloadingTrack || playlistProgress) && (
           <div className="relative h-full">
             {/* Progress Background */}
             <div
               className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 transition-all duration-500 ease-out"
-              style={{ width: `${downloadProgress}%` }}
+              style={{ 
+                width: playlistProgress 
+                  ? `${(playlistProgress.current / playlistProgress.total) * 100}%`
+                  : `${downloadProgress}%` 
+              }}
             />
 
             <div className="relative flex items-center h-full px-2 md:px-4 gap-2 md:gap-3">
               {/* Icon/Artwork */}
-              {downloadingTrack.artwork ? (
+              {playlistProgress ? (
+                <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center flex-shrink-0">
+                  <FiDownload className="w-5 h-5 md:w-6 md:h-6 text-white animate-pulse" style={{ animationDuration: '2s' }} />
+                </div>
+              ) : downloadingTrack?.artwork ? (
                 <img
                   src={downloadingTrack.artwork}
                   alt={downloadingTrack.title}
@@ -316,22 +328,41 @@ export default function DynamicIsland({
 
               {/* Download Info */}
               <div className="flex-1 min-w-0">
-                <div className="text-[rgb(var(--color-on-surface))] text-xs md:text-sm font-semibold truncate">
-                  {downloadingTrack.title}
-                </div>
-                <div className="text-[rgb(var(--color-on-surface))]/60 text-[10px] md:text-xs truncate">
-                  {downloadingTrack.artist}
-                </div>
-                <div className="text-[rgb(var(--color-on-surface))]/40 text-[10px] md:text-xs mt-0.5 md:mt-1">
-                  Baixando... {Math.round(downloadProgress || 0)}%
-                </div>
+                {playlistProgress ? (
+                  <>
+                    <div className="text-[rgb(var(--color-on-surface))] text-xs md:text-sm font-semibold truncate">
+                      {playlistProgress.title}
+                    </div>
+                    <div className="text-[rgb(var(--color-on-surface))]/60 text-[10px] md:text-xs truncate">
+                      {playlistProgress.currentTrack}
+                    </div>
+                    <div className="text-[rgb(var(--color-on-surface))]/40 text-[10px] md:text-xs mt-0.5 md:mt-1">
+                      {playlistProgress.current} de {playlistProgress.total} músicas
+                    </div>
+                  </>
+                ) : downloadingTrack && (
+                  <>
+                    <div className="text-[rgb(var(--color-on-surface))] text-xs md:text-sm font-semibold truncate">
+                      {downloadingTrack.title}
+                    </div>
+                    <div className="text-[rgb(var(--color-on-surface))]/60 text-[10px] md:text-xs truncate">
+                      {downloadingTrack.artist}
+                    </div>
+                    <div className="text-[rgb(var(--color-on-surface))]/40 text-[10px] md:text-xs mt-0.5 md:mt-1">
+                      Baixando... {Math.round(downloadProgress || 0)}%
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Progress Indicator */}
               <div className="flex-shrink-0">
                 <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[rgb(var(--color-surface-variant))]/50 flex items-center justify-center">
                   <div className="text-[rgb(var(--color-on-surface))] text-[10px] md:text-xs font-bold">
-                    {Math.round(downloadProgress || 0)}%
+                    {playlistProgress 
+                      ? `${playlistProgress.current}/${playlistProgress.total}`
+                      : `${Math.round(downloadProgress || 0)}%`
+                    }
                   </div>
                 </div>
               </div>

@@ -1,9 +1,14 @@
 import type { ResolveUrlRequest, ResolveUrlResponse } from '@music-downloader/shared';
+import { MusicUrlParserFactory, SoundCloudParser } from '@music-downloader/shared';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { getSoundCloudInfo, getStreamUrl } from '../services/soundcloud-api.js';
 
 const router = Router();
+
+// Inicializar o parser factory
+const parserFactory = new MusicUrlParserFactory();
+parserFactory.register(new SoundCloudParser());
 
 // Resolve SoundCloud URL (track or playlist)
 // Token is automatically extracted from URL if present (e.g., ?secret_token=...)
@@ -18,10 +23,17 @@ router.post('/resolve', async (req: Request, res: Response) => {
       });
     }
 
-    const info = await getSoundCloudInfo(url);
+    // Parse e sanitiza a URL
+    const parsed = parserFactory.parse(url);
+    
+    // Usa a URL sanitizada para buscar informações
+    const info = await getSoundCloudInfo(parsed.sanitizedUrl);
     
     const response: ResolveUrlResponse = {
-      type: info.kind === 'playlist' ? 'playlist' : 'track',
+      provider: parsed.provider,
+      type: parsed.contentType,
+      isPrivate: parsed.isPrivate,
+      sanitizedUrl: parsed.sanitizedUrl,
       data: info
     };
 

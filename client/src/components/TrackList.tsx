@@ -1,7 +1,8 @@
 import { saveAs } from 'file-saver';
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
-import { FiDownload, FiEdit2, FiGrid, FiList, FiLoader, FiMusic, FiPlay, FiSquare, FiTrash2, FiX, FiMoreVertical, FiPlus } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiGrid, FiList, FiLoader, FiMusic, FiPlay, FiSquare, FiTrash2, FiX, FiMoreVertical, FiPlus, FiArrowUp, FiArrowDown, FiFilter } from 'react-icons/fi';
 import { useDeleteTrack, useTracks } from '../hooks/useStorage';
 import { useConvertAudio } from '../hooks/useFFmpeg';
 import type { AudioFormat, StoredTrack } from '@music-downloader/shared';
@@ -9,6 +10,7 @@ import TrackMetadataEditor from './TrackMetadataEditor';
 import { useModal } from '../layouts/MainLayout';
 
 type ViewMode = 'list' | 'grid' | 'compact-grid';
+type SortOption = 'download' | 'title' | 'artist' | 'bpm' | 'duration' | 'genre';
 
 interface TrackListProps {
   selectedTracks: Set<string>;
@@ -27,8 +29,12 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   const convertAudio = useConvertAudio();
   const { setIsModalOpen } = useModal();
   
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('compact-grid');
+  const [sortBy, setSortBy] = useState<SortOption>('download');
+  const [isAscending, setIsAscending] = useState(true);
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
   const [showFormatModal, setShowFormatModal] = useState(false);
   const [isFormatModalAnimating, setIsFormatModalAnimating] = useState(false);
   const [selectedTrackForDownload, setSelectedTrackForDownload] = useState<StoredTrack | null>(null);
@@ -39,9 +45,21 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sincroniza o estado dos modais com o contexto
+  // Sincroniza o estado dos modais com o contexto e bloqueia scroll
   useEffect(() => {
-    setIsModalOpen(showFormatModal || editingTrack !== null);
+    const isOpen = showFormatModal || editingTrack !== null;
+    setIsModalOpen(isOpen);
+    
+    // Bloquear scroll da página quando modal está aberto
+    if (isOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
   }, [showFormatModal, editingTrack, setIsModalOpen]);
 
   // Anima entrada do modal de formato
@@ -67,6 +85,9 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null);
+      }
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
+        setIsSortDropdownOpen(false);
       }
     };
 
@@ -228,6 +249,35 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   };
 
+  // Sort tracks based on selected option
+  const sortedTracks = tracks ? [...tracks].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortBy) {
+      case 'download':
+        // Para download, mais recente = menor (createdAt maior = menor na ordem)
+        comparison = (a.createdAt || 0) - (b.createdAt || 0);
+        break;
+      case 'title':
+        comparison = a.title.localeCompare(b.title);
+        break;
+      case 'artist':
+        comparison = a.artist.localeCompare(b.artist);
+        break;
+      case 'bpm':
+        comparison = (a.bpm || 0) - (b.bpm || 0);
+        break;
+      case 'duration':
+        comparison = a.duration - b.duration;
+        break;
+      case 'genre':
+        comparison = (a.genre || '').localeCompare(b.genre || '');
+        break;
+    }
+    
+    return isAscending ? comparison : -comparison;
+  }) : [];
+
   if (isLoading) {
     return (
       <div className="bg-[rgb(var(--color-surface))]/60 backdrop-blur-2xl rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 p-6 md:p-12 flex items-center justify-center">
@@ -270,41 +320,161 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
             </button>
           </div>
           
-          {/* View Mode Switcher */}
-          <div className="flex items-center space-x-1 md:space-x-2 bg-[rgb(var(--color-surface-variant))]/40 p-1 rounded-lg md:rounded-xl self-start md:self-auto">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
-                viewMode === 'list'
-                  ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
-                  : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
-              }`}
-              title="Visualização em Lista"
-            >
-              <FiList className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => setViewMode('compact-grid')}
-              className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
-                viewMode === 'compact-grid'
-                  ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
-                  : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
-              }`}
-              title="Grid Compacto"
-            >
-              <FiSquare className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
-                viewMode === 'grid'
-                  ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
-                  : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
-              }`}
-              title="Grid Expandido"
-            >
-              <FiGrid className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
+          <div className="flex items-center gap-2">
+            {/* Sort Controls - Modern Compact Design */}
+            <div className="flex items-center gap-1.5 bg-[rgb(var(--color-surface-variant))]/40 p-1 rounded-lg md:rounded-xl">
+              {/* Sort Dropdown */}
+              <div className="relative" ref={sortDropdownRef}>
+                <button
+                  onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                  className="flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2.5 hover:bg-[rgb(var(--color-surface-variant))]/60 rounded-lg transition-all text-[rgb(var(--color-on-surface))] text-xs md:text-sm font-medium"
+                  title="Ordenar por"
+                >
+                  <FiFilter className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                  <span className="hidden md:inline">
+                    {sortBy === 'download' && 'Recentes'}
+                    {sortBy === 'title' && 'Nome'}
+                    {sortBy === 'artist' && 'Artista'}
+                    {sortBy === 'bpm' && 'BPM'}
+                    {sortBy === 'duration' && 'Duração'}
+                    {sortBy === 'genre' && 'Gênero'}
+                  </span>
+                </button>
+                
+                {isSortDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-[rgb(var(--color-surface))] rounded-xl shadow-2xl border border-[rgb(var(--color-on-surface))]/10 py-1 z-50">
+                    <button
+                      onClick={() => {
+                        setSortBy('download');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'download'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      Recentes
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('title');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'title'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      Nome
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('artist');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'artist'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      Artista
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('bpm');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'bpm'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      BPM
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('duration');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'duration'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      Duração
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy('genre');
+                        setIsSortDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        sortBy === 'genre'
+                          ? 'bg-[rgb(var(--color-primary))]/10 text-[rgb(var(--color-primary))] font-semibold'
+                          : 'text-[rgb(var(--color-on-surface))] hover:bg-[rgb(var(--color-surface-variant))]/30'
+                      }`}
+                    >
+                      Gênero
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Sort Order Toggle */}
+              <button
+                onClick={() => setIsAscending(!isAscending)}
+                className="p-2 md:p-2.5 hover:bg-[rgb(var(--color-surface-variant))]/60 rounded-lg transition-all text-[rgb(var(--color-on-surface))]"
+                title={isAscending ? 'Ordem crescente' : 'Ordem decrescente'}
+              >
+                {isAscending ? (
+                  <FiArrowUp className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                ) : (
+                  <FiArrowDown className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center space-x-1 md:space-x-2 bg-[rgb(var(--color-surface-variant))]/40 p-1 rounded-lg md:rounded-xl">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
+                  viewMode === 'list'
+                    ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
+                    : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
+                }`}
+                title="Visualização em Lista"
+              >
+                <FiList className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('compact-grid')}
+                className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
+                  viewMode === 'compact-grid'
+                    ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
+                    : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
+                }`}
+                title="Grid Compacto"
+              >
+                <FiSquare className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 md:p-2.5 rounded-lg transition-all duration-200 ${
+                  viewMode === 'grid'
+                    ? 'bg-[rgb(var(--color-primary))] text-white shadow-lg'
+                    : 'text-[rgb(var(--color-on-surface))]/60 hover:bg-[rgb(var(--color-surface-variant))]/60'
+                }`}
+                title="Grid Expandido"
+              >
+                <FiGrid className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -313,7 +483,7 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
       <div className={`p-2 md:p-6 ${viewMode === 'list' ? 'space-y-2' : ''}`}>
         {viewMode === 'list' && (
           <div className="space-y-2">
-            {tracks.map((track) => (
+            {sortedTracks.map((track) => (
               <div
                 key={track.id}
                 onMouseEnter={() => setHoveredTrack(track.id)}
@@ -480,7 +650,7 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
 
         {viewMode === 'compact-grid' && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-            {tracks.map((track) => (
+            {sortedTracks.map((track) => (
               <div
                 key={track.id}
                 onMouseEnter={() => setHoveredTrack(track.id)}
@@ -617,7 +787,7 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
 
         {viewMode === 'grid' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-            {tracks.map((track) => (
+            {sortedTracks.map((track) => (
               <div
                 key={track.id}
                 onMouseEnter={() => setHoveredTrack(track.id)}
@@ -777,9 +947,9 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
       </div>
 
       {/* Format Selection Modal */}
-      {showFormatModal && selectedTrackForDownload && (
+      {showFormatModal && selectedTrackForDownload && createPortal(
         <div 
-          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] px-3 py-4 md:p-4 transition-opacity duration-200 ${
+          className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] px-3 py-4 md:p-4 transition-opacity duration-200 ${
             isFormatModalAnimating ? 'opacity-100' : 'opacity-0'
           }`}
           onClick={handleCloseFormatModal}
@@ -849,12 +1019,13 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Conversion Progress Modal */}
-      {isConverting && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 md:p-4">
+      {isConverting && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-3 md:p-4">
           <div className="bg-[rgb(var(--color-surface))] rounded-2xl md:rounded-3xl shadow-2xl border border-[rgb(var(--color-primary))]/20 max-w-md w-full p-5 md:p-6">
             <div className="flex items-center justify-center mb-3 md:mb-4">
               <FiLoader className="w-10 h-10 md:w-12 md:h-12 animate-spin text-[rgb(var(--color-primary))]" />
@@ -875,7 +1046,8 @@ export default function TrackList({ selectedTracks, onSelectionChange, onPlayTra
               {conversionProgress}%
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Track Metadata Editor Modal */}
